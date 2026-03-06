@@ -1,292 +1,106 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<title>AI 동화 모험</title>
-
-<script src="https://cdn.tailwindcss.com"></script>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<title>AI 동화 만들기</title>
 
 <style>
-
 body{
-background:#f1f5f9;
-font-family:sans-serif;
-}
-
-.card{
-background:white;
-border-radius:20px;
+font-family: Arial;
 padding:20px;
-box-shadow:0 10px 30px rgba(0,0,0,0.1);
+background:#f5f5f5;
 }
 
-.choice{
-transition:0.2s;
+.container{
+max-width:500px;
+margin:auto;
+background:white;
+padding:20px;
+border-radius:10px;
+box-shadow:0 0 10px rgba(0,0,0,0.1);
 }
 
-.choice:hover{
-transform:scale(1.03);
+input,button{
+width:100%;
+padding:12px;
+margin-top:10px;
+font-size:16px;
 }
 
+button{
+background:#4CAF50;
+color:white;
+border:none;
+border-radius:6px;
+}
+
+#result{
+margin-top:20px;
+white-space:pre-wrap;
+}
 </style>
-
 </head>
 
-<body class="p-6">
+<body>
 
-<div class="max-w-xl mx-auto space-y-6">
+<div class="container">
 
-<h1 class="text-3xl font-bold text-center">
-✨ AI 동화 모험
-</h1>
+<h2>AI 동화 만들기</h2>
 
-<div id="startBox" class="card space-y-4">
+<input id="name" placeholder="주인공 이름">
 
-<input id="nameInput"
-class="w-full border p-3 rounded"
-placeholder="주인공 이름">
+<input id="apikey" placeholder="OpenAI API Key">
 
-<input id="apiInput"
-class="w-full border p-3 rounded"
-placeholder="Gemini API Key">
+<button onclick="makeStory()">동화 만들기</button>
 
-<button onclick="startStory()"
-class="w-full bg-sky-600 text-white p-3 rounded">
-모험 시작
-</button>
-
-</div>
-
-<div id="storyArea" class="space-y-6"></div>
-
-<div id="choices" class="space-y-3"></div>
-
-<div id="controls" class="space-y-3 hidden">
-
-<button onclick="readStory()"
-class="w-full bg-green-500 text-white p-3 rounded">
-🔊 읽어주기
-</button>
-
-<button onclick="saveStory()"
-class="w-full bg-purple-500 text-white p-3 rounded">
-💾 동화 저장
-</button>
-
-<button onclick="downloadPDF()"
-class="w-full bg-blue-500 text-white p-3 rounded">
-📖 PDF 동화책 다운로드
-</button>
-
-<button onclick="restart()"
-class="w-full bg-orange-500 text-white p-3 rounded">
-🔄 다시 시작
-</button>
-
-</div>
+<div id="result"></div>
 
 </div>
 
 <script>
 
-let story=[]
-let name=""
-let apiKey=""
+async function makeStory(){
 
-function startStory(){
+const name=document.getElementById("name").value
+const key=document.getElementById("apikey").value
+const result=document.getElementById("result")
 
-name=document.getElementById("nameInput").value
-apiKey=document.getElementById("apiInput").value
-
-if(!name||!apiKey){
-alert("이름과 API키 입력")
+if(!name || !key){
+alert("이름과 API키를 입력하세요")
 return
 }
 
-document.getElementById("startBox").style.display="none"
+result.innerText="동화 만드는 중..."
 
-generatePart("이야기 시작")
+try{
 
-}
-
-async function generatePart(choice){
-
-let context=story.join("\n")
-
-let prompt=`
-
-주인공 이름:${name}
-
-어린이용 동화 (5~10세)
-
-이전 내용:
-${context}
-
-선택:
-${choice}
-
-형식
-
-STORY:
-동화 내용
-
-IMAGE:
-영어 키워드 하나
-
-CHOICE1:
-선택지
-
-CHOICE2:
-선택지
-
-`
-
-let res=await fetch(
-"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key="+apiKey,
-{
+const response=await fetch("https://api.openai.com/v1/chat/completions",{
 method:"POST",
 headers:{
-"Content-Type":"application/json"
+"Content-Type":"application/json",
+"Authorization":"Bearer "+key
 },
 body:JSON.stringify({
-contents:[
+model:"gpt-4o-mini",
+messages:[
 {
-parts:[
-{ text:prompt }
-]
+role:"user",
+content:name+" 이라는 아이가 주인공인 짧은 동화를 만들어줘"
 }
 ]
 })
-}
-)
-
-let data=await res.json()
-
-let text=data.candidates[0].content.parts[0].text
-
-let storyText=text.split("IMAGE:")[0].replace("STORY:","")
-
-let imageKey=text.split("IMAGE:")[1].split("CHOICE1:")[0]
-
-let c1=text.split("CHOICE1:")[1].split("CHOICE2:")[0]
-let c2=text.split("CHOICE2:")[1]
-
-story.push(storyText)
-
-renderStory(storyText,imageKey)
-
-renderChoices(c1,c2)
-
-document.getElementById("controls").classList.remove("hidden")
-
-}
-
-function renderStory(text,imageKey){
-
-let box=document.getElementById("storyArea")
-
-let imgUrl=`https://image.pollinations.ai/prompt/${imageKey}%20storybook`
-
-let card=document.createElement("div")
-card.className="card space-y-4"
-
-let img=document.createElement("img")
-img.src=imgUrl
-img.className="rounded"
-
-let p=document.createElement("p")
-p.innerText=text
-
-card.appendChild(img)
-card.appendChild(p)
-
-box.appendChild(card)
-
-}
-
-function renderChoices(c1,c2){
-
-let box=document.getElementById("choices")
-
-box.innerHTML=""
-
-let b1=document.createElement("button")
-b1.className="choice w-full bg-white border p-3 rounded"
-b1.innerText=c1
-b1.onclick=()=>generatePart(c1)
-
-let b2=document.createElement("button")
-b2.className="choice w-full bg-white border p-3 rounded"
-b2.innerText=c2
-b2.onclick=()=>generatePart(c2)
-
-box.appendChild(b1)
-box.appendChild(b2)
-
-}
-
-function readStory(){
-
-let text=story.join(" ")
-
-let msg=new SpeechSynthesisUtterance(text)
-
-msg.lang="ko-KR"
-
-speechSynthesis.speak(msg)
-
-}
-
-function saveStory(){
-
-let saved=JSON.parse(localStorage.getItem("stories")||"[]")
-
-saved.push({
-date:new Date().toLocaleString(),
-story:story
 })
 
-localStorage.setItem("stories",JSON.stringify(saved))
+const data=await response.json()
 
-alert("저장 완료")
+result.innerText=data.choices[0].message.content
 
-}
+}catch(e){
 
-function downloadPDF(){
-
-const { jsPDF } = window.jspdf
-
-let pdf=new jsPDF()
-
-let y=20
-
-pdf.setFontSize(16)
-pdf.text("AI 동화책",20,y)
-
-y+=20
-
-story.forEach(part=>{
-
-let lines=pdf.splitTextToSize(part,170)
-
-pdf.text(lines,20,y)
-
-y+=lines.length*10+10
-
-})
-
-pdf.save("ai_story.pdf")
+result.innerText="에러 발생: "+e
 
 }
-
-function restart(){
-
-location.reload()
 
 }
 
