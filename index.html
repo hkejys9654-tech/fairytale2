@@ -1,245 +1,296 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 동화 모험: 나만의 이야기 만들기</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { 
-            font-family: 'Inter', sans-serif; 
-            background-color: #F8FAFC; 
-            color: #1E293B; 
-            -webkit-font-smoothing: antialiased;
-            background-image: 
-                radial-gradient(circle at 20% 30%, rgba(56, 189, 248, 0.1) 0%, transparent 40%),
-                radial-gradient(circle at 80% 70%, rgba(139, 92, 246, 0.1) 0%, transparent 40%);
-            background-attachment: fixed;
-        }
-        .font-space { font-family: 'Orbitron', sans-serif; }
-        .glass {
-            background: rgba(255, 255, 255, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(56, 189, 248, 0.2);
-        }
-        .glow-blue { box-shadow: 0 10px 30px rgba(56, 189, 248, 0.15); }
-        @keyframes float {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
-            100% { transform: translateY(0px); }
-        }
-        .animate-float { animation: float 4s ease-in-out infinite; }
-        .choice-btn { transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .choice-btn:hover { transform: translateY(-2px) scale(1.02); box-shadow: 0 0 15px rgba(56, 189, 248, 0.4); }
-    </style>
+
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>AI 동화 모험</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+
+body{
+background:#f1f5f9;
+font-family:sans-serif;
+}
+
+.card{
+background:white;
+border-radius:20px;
+padding:20px;
+box-shadow:0 10px 30px rgba(0,0,0,0.1);
+}
+
+.choice{
+transition:0.2s;
+}
+
+.choice:hover{
+transform:scale(1.03);
+}
+
+</style>
+
 </head>
-<body class="overflow-x-hidden">
-    <div id="root"></div>
 
-    <script type="importmap">
-    {
-      "imports": {
-        "react": "https://esm.sh/react@18.2.0",
-        "react-dom": "https://esm.sh/react-dom@18.2.0",
-        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-        "@google/genai": "https://esm.run/@google/genai",
-        "lucide-react": "https://esm.sh/lucide-react@0.344.0",
-        "framer-motion": "https://esm.sh/framer-motion@10.16.4"
-      }
-    }
-    </script>
+<body class="p-6">
 
-    <script type="module">
-        import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-        import { createRoot } from 'react-dom/client';
-        import { GoogleGenAI } from "@google/genai";
-        import { 
-            Rocket, Download, Play, Square, Loader2, 
-            Zap, Volume2, Settings2, ChevronDown, Orbit, Heart, Shield, Ghost,
-            Star, Trophy, Medal, PenTool, Save, RotateCcw, BookOpen, Key
-        } from 'lucide-react';
-        import { motion, AnimatePresence } from 'framer-motion';
+<div class="max-w-xl mx-auto space-y-6">
 
-        // 모바일 스토리지 접근 에러 방지 함수
-        const getSafeStorage = (key, defaultVal = '') => {
-            try {
-                return localStorage.getItem(key) || defaultVal;
-            } catch (e) {
-                console.warn("Storage access denied", e);
-                return defaultVal;
-            }
-        };
+<h1 class="text-3xl font-bold text-center">
+✨ AI 동화 모험
+</h1>
 
-        function App() {
-            const [name, setName] = useState('');
-            const [storyParts, setStoryParts] = useState([]);
-            const [currentChoices, setCurrentChoices] = useState([]);
-            const [isLoading, setIsLoading] = useState(false);
-            const [isReading, setIsReading] = useState(false);
-            const [voices, setVoices] = useState([]);
-            const [selectedVoiceIndex, setSelectedVoiceIndex] = useState(0);
-            const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-            const [readingProgress, setReadingProgress] = useState(0);
-            const [missionCount, setMissionCount] = useState(() => parseInt(getSafeStorage('space_hero_count', '0')));
-            const [diary, setDiary] = useState('');
-            const [isFinished, setIsFinished] = useState(false);
-            const [savedStories, setSavedStories] = useState(() => JSON.parse(getSafeStorage('space_hero_stories', '[]')));
-            const [isArchiveOpen, setIsArchiveOpen] = useState(false);
-            const [statusMessage, setStatusMessage] = useState('');
-            const [apiKey, setApiKey] = useState(() => getSafeStorage('gemini_api_key'));
-            const [inputKey, setInputKey] = useState(() => getSafeStorage('gemini_api_key'));
-            
-            const audioRef = useRef(null);
-            const scrollRef = useRef(null);
+<div id="startBox" class="card space-y-4">
 
-            const BGM_URL = "https://cdn.pixabay.com/download/audio/2022/03/10/audio_c8c8a73484.mp3";
+<input id="nameInput"
+class="w-full border p-3 rounded"
+placeholder="주인공 이름">
 
-            const saveCurrentStory = () => {
-                if (storyParts.length === 0) return;
-                const newStory = {
-                    id: Date.now(),
-                    name: name,
-                    parts: storyParts,
-                    date: new Date().toLocaleString()
-                };
-                const updated = [newStory, ...savedStories].slice(0, 10);
-                setSavedStories(updated);
-                try { localStorage.setItem('space_hero_stories', JSON.stringify(updated)); } catch(e){}
-            };
+<input id="apiInput"
+class="w-full border p-3 rounded"
+placeholder="Gemini API Key">
 
-            const rankInfo = useMemo(() => {
-                if (missionCount >= 6) return { label: '전설의 모험가', color: 'text-yellow-600', icon: Trophy };
-                if (missionCount >= 3) return { label: '숙련된 탐험가', color: 'text-sky-600', icon: Medal };
-                return { label: '초보 여행자', color: 'text-slate-600', icon: Star };
-            }, [missionCount]);
+<button onclick="startStory()"
+class="w-full bg-sky-600 text-white p-3 rounded">
+모험 시작
+</button>
 
-            const RankIcon = rankInfo.icon;
+</div>
 
-            const loadVoices = useCallback(() => {
-                let availableVoices = window.speechSynthesis.getVoices();
-                if (availableVoices.length === 0) return;
-                const filtered = availableVoices.filter(v => v.lang.includes('ko') || v.lang.includes('en'));
-                setVoices(filtered.length > 0 ? filtered : availableVoices);
-            }, []);
+<div id="storyArea" class="space-y-6"></div>
 
-            useEffect(() => {
-                loadVoices();
-                if (window.speechSynthesis.onvoiceschanged !== undefined) {
-                    window.speechSynthesis.onvoiceschanged = loadVoices;
-                }
-            }, [loadVoices]);
+<div id="choices" class="space-y-3"></div>
 
-            const saveApiKey = () => {
-                try { localStorage.setItem('gemini_api_key', inputKey); } catch(e){}
-                setApiKey(inputKey);
-                setIsSettingsOpen(false);
-            };
+<div id="controls" class="space-y-3 hidden">
 
-            const generatePart = async (choice = null) => {
-                if (!apiKey) {
-                    setStatusMessage("설정에서 API 키를 먼저 입력해 주세요!");
-                    setIsSettingsOpen(true);
-                    return;
-                }
-                setIsLoading(true);
-                setIsFinished(false);
-                setStatusMessage('');
-                
-                try {
-                    const genAI = new GoogleGenAI(apiKey);
-                    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-                    const isFirst = storyParts.length === 0;
-                    const currentPartNum = storyParts.length + 1;
-                    const context = storyParts.map(p => p.text).join('\n');
-                    
-                    const prompt = `주인공 이름: ${name}. 5~10세용 동화. 파트 ${currentPartNum}/5. 선택지: ${choice || '시작'}. 이전내용: ${context}. 쉬운 말투로 작성. 5번째면 'FINISH' 포함. IMAGE_KEYWORD: [영단어1개], CHOICE1: [내용], CHOICE2: [내용] 형식 필수.`;
+<button onclick="readStory()"
+class="w-full bg-green-500 text-white p-3 rounded">
+🔊 읽어주기
+</button>
 
-                    const result = await model.generateContent(prompt);
-                    const responseText = result.response.text();
-                    
-                    const textMatch = responseText.split(/IMAGE_KEYWORD:|CHOICE1:|CHOICE2:|FINISH/i)[0].trim();
-                    const keywordMatch = responseText.match(/IMAGE_KEYWORD:\s*\[?([^\]\n]+)\]?/i);
-                    const c1Match = responseText.match(/CHOICE1:\s*\[?([^\]\n]+)\]?/i);
-                    const c2Match = responseText.match(/CHOICE2:\s*\[?([^\]\n]+)\]?/i);
-                    const finishMatch = responseText.toUpperCase().includes('FINISH') || currentPartNum >= 5;
+<button onclick="saveStory()"
+class="w-full bg-purple-500 text-white p-3 rounded">
+💾 동화 저장
+</button>
 
-                    const safeKeyword = (keywordMatch ? keywordMatch[1] : 'adventure').replace(/[^a-z]/gi, '');
-                    const imageUrl = `https://image.pollinations.ai/prompt/${safeKeyword}%20storybook%20illustration?width=800&height=400&nologo=true`;
+<button onclick="downloadPDF()"
+class="w-full bg-blue-500 text-white p-3 rounded">
+📖 PDF 동화책 다운로드
+</button>
 
-                    const newPart = { text: textMatch, image: imageUrl, id: Date.now() };
-                    setStoryParts(prev => [...prev, newPart]);
-                    
-                    if (finishMatch) {
-                        setIsFinished(true);
-                        const newCount = missionCount + 1;
-                        setMissionCount(newCount);
-                        try { localStorage.setItem('space_hero_count', newCount.toString()); } catch(e){}
-                    } else {
-                        setCurrentChoices([c1Match?.[1] || "계속하기", c2Match?.[1] || "둘러보기"]);
-                    }
-                } catch (error) {
-                    setStatusMessage("오류가 발생했습니다. 키를 확인하거나 다시 시도해 주세요.");
-                } finally {
-                    setIsLoading(false);
-                }
-            };
+<button onclick="restart()"
+class="w-full bg-orange-500 text-white p-3 rounded">
+🔄 다시 시작
+</button>
 
-            return React.createElement('div', { className: "min-h-screen flex flex-col items-center p-4 pb-20" },
-                React.createElement('header', { className: "w-full max-w-2xl pt-8 pb-6 flex flex-col items-center" },
-                    React.createElement(motion.div, { className: `flex items-center gap-2 px-4 py-1.5 rounded-full glass mb-4 ${rankInfo.color}` }, 
-                        React.createElement(RankIcon, { size: 16 }),
-                        React.createElement('span', { className: "text-[10px] font-bold uppercase tracking-widest" }, rankInfo.label)
-                    ),
-                    React.createElement('h1', { className: "text-3xl font-space font-bold text-slate-900 mb-2 text-center" }, "✨ AI 동화 모험 ✨"),
-                    React.createElement('button', { onClick: () => setIsArchiveOpen(true), className: "text-[10px] font-bold text-sky-400 glass px-3 py-1 rounded-lg" }, "모험 기록")
-                ),
-                React.createElement('main', { className: "w-full max-w-2xl space-y-6" },
-                    storyParts.length === 0 ? React.createElement('div', { className: "glass rounded-3xl p-8 glow-blue space-y-6" },
-                        React.createElement('input', { 
-                            value: name, onChange: e => setName(e.target.value), 
-                            placeholder: "주인공 이름", className: "w-full p-4 text-xl border-b-2 outline-none" 
-                        }),
-                        React.createElement('button', { 
-                            onClick: () => generatePart(), disabled: !name || isLoading,
-                            className: "w-full py-4 bg-sky-600 text-white rounded-2xl font-bold"
-                        }, isLoading ? "로딩 중..." : "모험 시작")
-                    ) : storyParts.map((part, i) => React.createElement('div', { key: part.id, className: "glass rounded-[2rem] overflow-hidden" },
-                        React.createElement('img', { src: part.image, className: "w-full h-48 object-cover" }),
-                        React.createElement('div', { className: "p-6" }, React.createElement('p', { className: "text-lg text-slate-700" }, part.text))
-                    )),
-                    !isFinished && storyParts.length > 0 && React.createElement('div', { className: "grid grid-cols-1 gap-4" },
-                        isLoading ? React.createElement(Loader2, { className: "animate-spin mx-auto text-sky-500" }) : 
-                        currentChoices.map((c, i) => React.createElement('button', { 
-                            key: i, onClick: () => generatePart(c),
-                            className: "choice-btn p-4 glass rounded-xl text-sky-600 text-sm font-bold text-left"
-                        }, `${i+1}. ${c}`))
-                    ),
-                    isFinished && React.createElement('div', { className: "glass rounded-3xl p-8 text-center space-y-4" },
-                        React.createElement('h2', { className: "text-2xl font-bold" }, "🎉 모험 완료!"),
-                        React.createElement('button', { onClick: () => window.location.reload(), className: "w-full py-4 bg-orange-500 text-white rounded-xl" }, "다시 하기")
-                    )
-                ),
-                React.createElement('footer', { className: "fixed bottom-0 w-full glass p-4 flex justify-between items-center px-8" },
-                    React.createElement(Settings2, { onClick: () => setIsSettingsOpen(true), className: "text-slate-400 cursor-pointer" }),
-                    statusMessage && React.createElement('span', { className: "text-[10px] text-red-500 font-bold" }, statusMessage)
-                ),
-                isSettingsOpen && React.createElement('div', { className: "fixed inset-0 bg-black/50 z-[100] flex items-center justify-center p-6" },
-                    React.createElement('div', { className: "bg-white p-6 rounded-3xl w-full max-w-xs space-y-4" },
-                        React.createElement('h3', { className: "font-bold" }, "API 설정"),
-                        React.createElement('input', { 
-                            type: "password", value: inputKey, onChange: e => setInputKey(e.target.value),
-                            placeholder: "Gemini API Key", className: "w-full p-2 border rounded" 
-                        }),
-                        React.createElement('button', { onClick: saveApiKey, className: "w-full py-2 bg-sky-600 text-white rounded" }, "저장"),
-                        React.createElement('button', { onClick: () => setIsSettingsOpen(false), className: "w-full py-2 text-slate-400" }, "닫기")
-                    )
-                )
-            );
-        }
+</div>
 
-        const container = document.getElementById('root');
-        if (container) createRoot(container).render(React.createElement(App));
-    </script>
+</div>
+
+<script>
+
+let story=[]
+let name=""
+let apiKey=""
+
+function startStory(){
+
+name=document.getElementById("nameInput").value
+apiKey=document.getElementById("apiInput").value
+
+if(!name||!apiKey){
+alert("이름과 API키 입력")
+return
+}
+
+document.getElementById("startBox").style.display="none"
+
+generatePart("이야기 시작")
+
+}
+
+async function generatePart(choice){
+
+let context=story.join("\n")
+
+let prompt=`
+
+주인공 이름:${name}
+
+어린이용 동화 (5~10세)
+
+이전 내용:
+${context}
+
+선택:
+${choice}
+
+형식
+
+STORY:
+동화 내용
+
+IMAGE:
+영어 키워드 하나
+
+CHOICE1:
+선택지
+
+CHOICE2:
+선택지
+
+`
+
+let res=await fetch(
+"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key="+apiKey,
+{
+method:"POST",
+headers:{
+"Content-Type":"application/json"
+},
+body:JSON.stringify({
+contents:[
+{
+parts:[
+{ text:prompt }
+]
+}
+]
+})
+}
+)
+
+let data=await res.json()
+
+let text=data.candidates[0].content.parts[0].text
+
+let storyText=text.split("IMAGE:")[0].replace("STORY:","")
+
+let imageKey=text.split("IMAGE:")[1].split("CHOICE1:")[0]
+
+let c1=text.split("CHOICE1:")[1].split("CHOICE2:")[0]
+let c2=text.split("CHOICE2:")[1]
+
+story.push(storyText)
+
+renderStory(storyText,imageKey)
+
+renderChoices(c1,c2)
+
+document.getElementById("controls").classList.remove("hidden")
+
+}
+
+function renderStory(text,imageKey){
+
+let box=document.getElementById("storyArea")
+
+let imgUrl=`https://image.pollinations.ai/prompt/${imageKey}%20storybook`
+
+let card=document.createElement("div")
+card.className="card space-y-4"
+
+let img=document.createElement("img")
+img.src=imgUrl
+img.className="rounded"
+
+let p=document.createElement("p")
+p.innerText=text
+
+card.appendChild(img)
+card.appendChild(p)
+
+box.appendChild(card)
+
+}
+
+function renderChoices(c1,c2){
+
+let box=document.getElementById("choices")
+
+box.innerHTML=""
+
+let b1=document.createElement("button")
+b1.className="choice w-full bg-white border p-3 rounded"
+b1.innerText=c1
+b1.onclick=()=>generatePart(c1)
+
+let b2=document.createElement("button")
+b2.className="choice w-full bg-white border p-3 rounded"
+b2.innerText=c2
+b2.onclick=()=>generatePart(c2)
+
+box.appendChild(b1)
+box.appendChild(b2)
+
+}
+
+function readStory(){
+
+let text=story.join(" ")
+
+let msg=new SpeechSynthesisUtterance(text)
+
+msg.lang="ko-KR"
+
+speechSynthesis.speak(msg)
+
+}
+
+function saveStory(){
+
+let saved=JSON.parse(localStorage.getItem("stories")||"[]")
+
+saved.push({
+date:new Date().toLocaleString(),
+story:story
+})
+
+localStorage.setItem("stories",JSON.stringify(saved))
+
+alert("저장 완료")
+
+}
+
+function downloadPDF(){
+
+const { jsPDF } = window.jspdf
+
+let pdf=new jsPDF()
+
+let y=20
+
+pdf.setFontSize(16)
+pdf.text("AI 동화책",20,y)
+
+y+=20
+
+story.forEach(part=>{
+
+let lines=pdf.splitTextToSize(part,170)
+
+pdf.text(lines,20,y)
+
+y+=lines.length*10+10
+
+})
+
+pdf.save("ai_story.pdf")
+
+}
+
+function restart(){
+
+location.reload()
+
+}
+
+</script>
+
 </body>
 </html>
